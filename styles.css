@@ -1076,6 +1076,33 @@ footer {
   font-size: 12px;
 }
 
+.donate-button {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 8px 13px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(var(--accent-rgb), .45);
+  border-radius: 2px;
+  background: rgba(var(--accent-rgb), .1);
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.donate-button:hover {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), .18);
+  transform: translateY(-1px);
+}
+
+.donate-button:focus-visible {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .12);
+}
+
 @media (max-width: 1220px) {
   .dashboard-grid {
     grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
