@@ -106,14 +106,17 @@
           <h3 id="loadTitle"><span class="card-index">01</span> Load your files</h3>
           <p><span class="status-dot"></span>Read locally, never uploaded</p>
         </div>
-        <div class="file-grid">
-          <div>
-            <label class="file-control" for="videoFile"><span>Video</span><strong>MOV / MP4</strong></label>
-            <input type="file" id="videoFile" accept="video/*">
-          </div>
-          <div>
-            <label class="file-control" for="gpxFile"><span>Ride data</span><strong>GPX</strong></label>
-            <input type="file" id="gpxFile" accept=".gpx">
+        <div class="load-strip-content">
+          <p class="control-help">Put your video and GPX file in the <code class="inline">data/</code> folder of this cloned repo before loading them here - the generated command assumes that location.</p>
+          <div class="file-grid">
+            <div>
+              <label class="file-control" for="videoFile"><span>Video</span><strong>MOV / MP4</strong></label>
+              <input type="file" id="videoFile" accept="video/*">
+            </div>
+            <div>
+              <label class="file-control" for="gpxFile"><span>Ride data</span><strong>GPX</strong></label>
+              <input type="file" id="gpxFile" accept=".gpx">
+            </div>
           </div>
         </div>
       </section>
@@ -252,7 +255,7 @@
             <input type="text" id="gpxPathField" placeholder="/absolute/path/to/ride.gpx">
           </div>
         </div>
-        <p class="path-note">For privacy, browsers only provide the filename. Paste an absolute path above if the input file is not beside <code class="inline">ride_overlay.py</code>.</p>
+        <p class="path-note">For privacy, browsers only provide the filename, so these default to <code class="inline">data/&lt;filename&gt;</code>. Paste an absolute path above instead if your files aren't in <code class="inline">data/</code>.</p>
         <div class="row">
           <div>
             <label for="outPathField">Output path</label>
@@ -902,7 +905,7 @@ document.getElementById("videoFile").addEventListener("change", e => {
   if (!file) return;
   state.videoFile = file;
   video.src = URL.createObjectURL(file);
-  document.getElementById("videoPathField").value = file.name;
+  document.getElementById("videoPathField").value = `data/${file.name}`;
   const outField = document.getElementById("outPathField");
   if (!outField.value) {
     outField.value = `data/${file.name.replace(/\.[^.]+$/, "")}_overlay.mp4`;
@@ -925,7 +928,7 @@ document.getElementById("gpxFile").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
   state.gpxFile = file;
-  document.getElementById("gpxPathField").value = file.name;
+  document.getElementById("gpxPathField").value = `data/${file.name}`;
   const reader = new FileReader();
   reader.onload = () => {
     try {

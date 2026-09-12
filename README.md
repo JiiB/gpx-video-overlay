@@ -112,8 +112,9 @@ tile servers reject requests with no `Referer` header, which is what a
 (`python3 -m http.server` in this folder, then open
 `http://localhost:8000/index.html`) and it'll work. Workflow:
 
-1. Load your video file and your GPX file. A route map and a whole-ride power
-   chart appear once the GPX loads.
+1. Put your video and GPX file in `data/` first (see [Local ride data](#local-ride-data)
+   above), then load them here. A route map and a whole-ride power chart
+   appear once the GPX loads.
 2. Position the video wherever you like with its own player controls (pause
    on a frame you recognize), then find the matching moment in the GPX file
    by dragging the **GPX time** slider, clicking a point on the **map**, or
@@ -138,10 +139,11 @@ tile servers reject requests with no `Referer` header, which is what a
    and run that to produce the actual overlaid video file.
 
    For privacy, browsers do not expose a selected file's absolute filesystem
-   path. The page therefore fills the input path fields with filenames only.
-   If an input is not beside `ride_overlay.py`, paste its absolute path into
-   the corresponding field before copying the command. The generated output
-   path defaults to `data/<video-name>_overlay.mp4` and remains editable.
+   path. The page therefore fills the input path fields with `data/<filename>`,
+   assuming you followed the `data/` convention above. If your files live
+   elsewhere, paste the absolute path into the corresponding field before
+   copying the command. The generated output path defaults to
+   `data/<video-name>_overlay.mp4` and remains editable.
 
 ## Flag reference
 
