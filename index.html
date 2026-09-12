@@ -70,17 +70,12 @@
     </div>
 
     <div class="hero-visual" aria-hidden="true">
-      <div class="visual-topline"><span>LIVE RIDE</span><span>06:42:18</span></div>
-      <svg class="route-line" viewBox="0 0 520 360" fill="none">
-        <path class="route-shadow" d="M34 292C83 255 111 284 147 244C181 207 155 164 204 142C258 118 277 179 325 146C367 117 343 73 402 56C439 45 473 67 493 29"/>
-        <path class="route-path" d="M34 292C83 255 111 284 147 244C181 207 155 164 204 142C258 118 277 179 325 146C367 117 343 73 402 56C439 45 473 67 493 29"/>
-      </svg>
-      <div class="visual-metrics">
-        <div><strong>286</strong><span>WATTS</span></div>
-        <div><strong>158</strong><span>BPM</span></div>
-        <div><strong>8.4</strong><span>GRADE %</span></div>
-      </div>
-      <div class="visual-pulse"></div>
+      <video id="hero-video" poster="hero-poster.jpg" muted loop playsinline preload="metadata">
+        <source src="hero-mobile.webm" type="video/webm" media="(max-width: 760px)">
+        <source src="hero-mobile.mp4" type="video/mp4" media="(max-width: 760px)">
+        <source src="hero-desktop.webm" type="video/webm">
+        <source src="hero-desktop.mp4" type="video/mp4">
+      </video>
     </div>
   </div>
 
@@ -1069,6 +1064,25 @@ document.getElementById("copyCmdBtn").addEventListener("click", () => {
 video.addEventListener("play", () => requestAnimationFrame(loop));
 video.addEventListener("seeked", draw);
 video.addEventListener("timeupdate", draw);
+
+// -------------------------------------------------------- hero video --
+const heroVideo = document.getElementById("hero-video");
+const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+const syncHeroVideoMotion = () => {
+  if (reduceMotionQuery.matches) {
+    heroVideo.pause();
+    heroVideo.removeAttribute("autoplay");
+  } else {
+    heroVideo.setAttribute("autoplay", "");
+    heroVideo.play().catch(() => {});
+  }
+};
+
+if (heroVideo) {
+  syncHeroVideoMotion();
+  reduceMotionQuery.addEventListener("change", syncHeroVideoMotion);
+}
 </script>
 </body>
 </html>
