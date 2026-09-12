@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GPX video overlay</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #14161a;
+    --panel: #1c1f26;
+    --border: #2c313c;
+    --text: #e8eaed;
+    --dim: #9aa2ad;
+    --accent: #4da6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 20px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { color: var(--dim); margin: 0 0 20px; }
+  .layout { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .stage { flex: 1 1 420px; min-width: 280px; max-width: 640px; }
+  .video-wrap { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
+  .video-wrap video { display: block; width: 100%; height: auto; }
+  .video-wrap canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  .panel { flex: 1 1 380px; min-width: 300px; display: flex; flex-direction: column; gap: 16px; }
+  fieldset {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px 14px;
+    background: var(--panel);
+  }
+  legend { padding: 0 6px; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  label { display: block; font-size: 12px; color: var(--dim); margin: 8px 0 3px; }
+  label:first-child { margin-top: 0; }
+  input[type=text], input[type=number], input[type=file], select, textarea {
+    width: 100%;
+    background: #101216;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 6px 8px;
+    font: inherit;
+  }
+  textarea { resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .row > * { flex: 1; }
+  button {
+    background: var(--accent);
+    color: #06202f;
+    border: none;
+    border-radius: 5px;
+    padding: 7px 12px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: #2c313c; color: var(--text); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .calib-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+  .calib-row input { flex: 1; }
+  .calib-row button { flex: 0 0 auto; padding: 6px 9px; }
+  details.fieldset-details {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 14px 0;
+    background: var(--panel);
+  }
+  details.fieldset-details[open] { padding-bottom: 14px; }
+  details.fieldset-details > summary {
+    padding: 12px 0;
+    margin: 0;
+    color: var(--dim);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+  }
+  details.fieldset-details > summary::-webkit-details-marker { display: none; }
+  details.fieldset-details > summary::before { content: "\25b8  "; }
+  details.fieldset-details[open] > summary::before { content: "\25be  "; }
+  .calib-help-text { color: var(--dim); font-size: 12.5px; margin: 0 0 8px; }
+  .readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .readout div { background: #101216; border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center; }
+  .readout .val { font-size: 18px; font-weight: 700; }
+  .readout .lbl { font-size: 11px; color: var(--dim); text-transform: uppercase; }
+  .status { font-size: 12px; color: var(--dim); white-space: pre-wrap; }
+  .metrics-list { display: flex; gap: 12px; flex-wrap: wrap; }
+  .metrics-list label { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text); margin: 0; }
+  code.inline { background: #101216; padding: 1px 5px; border-radius: 4px; }
+  #map { height: 240px; border-radius: 8px; margin-top: 12px; background: #101216; }
+  #powerChart {
+    display: block;
+    width: 100%;
+    height: 120px;
+    margin-top: 10px;
+    border-radius: 8px;
+    background: #101216;
+    border: 1px solid var(--border);
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .chart-lbl { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+
+<h1>GPX video overlay</h1>
+<p class="sub">Load a video + GPX from the same ride, dial in the sync offset visually, then copy the matching
+  <code class="inline">ride_overlay.py</code> command to render the real overlaid video. This page does not export
+  or upload anything &mdash; everything else happens locally in the browser, but the route map below needs internet
+  (it loads Leaflet and OpenStreetMap tiles from the network).</p>
+
+<div class="layout">
+  <div class="stage">
+    <div class="video-wrap">
+      <video id="video" controls playsinline></video>
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="readout" style="margin-top:12px">
+      <div><div class="val" id="rHr">--</div><div class="lbl">bpm</div></div>
+      <div><div class="val" id="rPower">--</div><div class="lbl">W (3s avg)</div></div>
+      <div><div class="val" id="rEle">--</div><div class="lbl">m</div></div>
+      <div><div class="val" id="rGrad">--</div><div class="lbl">grade</div></div>
+    </div>
+    <div class="status" id="status"></div>
+    <p class="chart-lbl">Route (click to jump the GPX slider there)</p>
+    <div id="map"></div>
+    <p class="chart-lbl">Power, whole ride (click/drag to jump the GPX slider &middot; scroll to zoom &middot; shift+drag to pan &middot; double-click to reset zoom)</p>
+    <canvas id="powerChart"></canvas>
+  </div>
+
+  <div class="panel">
+    <fieldset>
+      <legend>1. Load files</legend>
+      <label for="videoFile">Video file</label>
+      <input type="file" id="videoFile" accept="video/*">
+      <label for="gpxFile">GPX file</label>
+      <input type="file" id="gpxFile" accept=".gpx">
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Anchor sync</legend>
+      <p class="status" style="margin:0 0 8px">Position the video where you like with its own controls (pause on a
+        frame you recognize), then drag this slider through the GPX file until the badge above matches that frame,
+        then hit the button.</p>
+      <label for="gpxSlider">GPX time</label>
+      <input type="range" id="gpxSlider" min="0" max="0" step="1" value="0" style="width:100%" disabled>
+      <div class="row" style="margin-top:6px">
+        <div>
+          <label for="gpxSliderSec">Elapsed since GPX start (s)</label>
+          <input type="number" id="gpxSliderSec" min="0" max="0" step="1" value="0" disabled>
+        </div>
+        <div>
+          <label>Clock time</label>
+          <input type="text" id="gpxClockReadout" readonly>
+        </div>
+      </div>
+      <button id="setAnchorBtn" style="margin-top:10px" disabled>Set anchor: this GPX moment &harr; current video frame</button>
+    </fieldset>
+
+    <details class="fieldset-details">
+      <summary>3. Auto-calibrate from known power (optional)</summary>
+      <p class="calib-help-text">The anchor above gets you roughly in sync, but small clock drift between the video
+        and the GPX file can still leave things off by a second or two. If you filmed your cycling computer's screen
+        at a few moments during the ride, you can use those as ground truth: enter the video timestamp and the power
+        value you can read on screen at that moment for a couple of readings, then hit Auto-calibrate &mdash; it
+        searches nearby offsets for the one that best matches the power the GPX file reports at those times.</p>
+      <p class="calib-help-text">Example: at <code class="inline">0:50</code> into the video your bike computer shows
+        <code class="inline">369W</code>, and at <code class="inline">2:58</code> it shows <code
+          class="inline">384W</code>. Enter those two rows and calibrate &mdash; this is entirely optional, skip it
+        if you don't have footage of your computer or the anchor already looks accurate.</p>
+      <div id="calibRows"></div>
+      <button class="secondary" id="addCalibRowBtn" type="button">+ add reading</button>
+      <button id="calibrateBtn" style="margin-left:8px">Auto-calibrate</button>
+      <div class="status" id="calibStatus"></div>
+    </details>
+
+    <fieldset>
+      <legend>4. Nudge</legend>
+      <label for="nudge">Manual adjustment: <span id="nudgeVal">0.0s</span></label>
+      <input type="range" id="nudge" min="-30" max="30" step="0.5" value="0" style="width:100%">
+    </fieldset>
+
+    <fieldset>
+      <legend>Badge options</legend>
+      <div class="metrics-list" id="metricsList">
+        <label><input type="checkbox" value="hr" checked> Heart rate</label>
+        <label><input type="checkbox" value="power" checked> Power</label>
+        <label><input type="checkbox" value="wkg"> W/kg</label>
+        <label><input type="checkbox" value="elevation" checked> Elevation</label>
+        <label><input type="checkbox" value="gradient" checked> Gradient</label>
+      </div>
+      <label for="weightKg" style="margin-top:10px">Weight in kilo (needed for W/kg)</label>
+      <input type="number" id="weightKg" min="1" step="0.1" placeholder="e.g. 75">
+      <label for="position" style="margin-top:10px">Position</label>
+      <select id="position">
+        <option value="bottom-left" selected>Bottom left</option>
+        <option value="bottom-right">Bottom right</option>
+        <option value="top-left">Top left</option>
+        <option value="top-right">Top right</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>5. Render command</legend>
+      <div class="row">
+        <div>
+          <label for="videoPathField">Video path (as you'll run the CLI)</label>
+          <input type="text" id="videoPathField" placeholder="ride.mov">
+        </div>
+        <div>
+          <label for="gpxPathField">GPX path</label>
+          <input type="text" id="gpxPathField" placeholder="ride.gpx">
+        </div>
+      </div>
+      <label for="outPathField">Output path</label>
+      <input type="text" id="outPathField" placeholder="ride_overlay.mp4">
+      <label for="resolvedStart" style="margin-top:10px">Resolved sync (--gpx-start)</label>
+      <input type="text" id="resolvedStart" readonly>
+      <button id="copyCmdBtn" style="margin-top:10px">Copy CLI command</button>
+      <textarea id="cmdOut" rows="3" readonly style="margin-top:8px"></textarea>
+    </fieldset>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------- state --
+const state = {
+  points: [],           // parsed GPX points: {t (ms epoch), lat, lon, ele, power, hr}
+  timeline: [],          // per-second samples across the whole GPX file, t=0 at points[0].t
+  samples: [],          // per-second samples relative to effective gpx start (for video playback)
+  baseStartMs: null,    // gpx_start before --nudge, ms epoch UTC
+  nudgeSec: 0,
+  videoFile: null,
+  gpxFile: null,
+  previewingGpx: false, // true while the GPX slider (not video playback) drives the badge
+  map: null,             // Leaflet map instance
+  mapMarker: null,       // Leaflet circle marker showing current position
+  chartBg: null,         // cached ImageData of the static power chart background
+  chartTotalSec: 0,      // ride duration in seconds, for chart x-axis scaling
+  chartView: { start: 0, end: 0 }, // visible [start,end] window in ride seconds (zoom/pan)
+};
+
+const CHART_MIN_WINDOW_SEC = 5;
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const statusEl = document.getElementById("status");
+
+function log(msg) {
+  statusEl.textContent = msg;
+}
+
+// ------------------------------------------------------------- GPX load --
+
+function parseGPX(text) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) {
+    throw new Error("Could not parse GPX (invalid XML)");
+  }
+  const trkpts = doc.getElementsByTagName("trkpt");
+  const points = [];
+
+  function collectExt(node, out) {
+    for (const child of node.children) {
+      const ln = child.localName;
+      if (ln === "power") out.power = parseFloat(child.textContent);
+      else if (ln === "hr") out.hr = parseFloat(child.textContent);
+      else collectExt(child, out);
+    }
+  }
+
+  for (const trkpt of trkpts) {
+    let timeText = null, ele = null;
+    const ext = { power: null, hr: null };
+    for (const child of trkpt.children) {
+      const ln = child.localName;
+      if (ln === "time") timeText = child.textContent;
+      else if (ln === "ele") ele = parseFloat(child.textContent);
+      else if (ln === "extensions") collectExt(child, ext);
+    }
+    if (!timeText) continue;
+    const t = Date.parse(timeText);
+    if (Number.isNaN(t)) continue;
+    points.push({
+      t,
+      lat: trkpt.hasAttribute("lat") ? parseFloat(trkpt.getAttribute("lat")) : null,
+      lon: trkpt.hasAttribute("lon") ? parseFloat(trkpt.getAttribute("lon")) : null,
+      ele: Number.isNaN(ele) ? null : ele,
+      power: Number.isNaN(ext.power) ? null : ext.power,
+      hr: Number.isNaN(ext.hr) ? null : ext.hr,
+    });
+  }
+  points.sort((a, b) => a.t - b.t);
+  return points;
+}
+
+// ------------------------------------------------------------- telemetry --
+
+function haversineM(lat1, lon1, lat2, lon2) {
+  const r = 6371000;
+  const p1 = lat1 * Math.PI / 180, p2 = lat2 * Math.PI / 180;
+  const dphi = (lat2 - lat1) * Math.PI / 180;
+  const dlambda = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dphi / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dlambda / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(a));
+}
+
+const SMOOTH_WINDOW = 3;
+const GRADIENT_WINDOW = 9;
+
+function buildSamples(points, gpxStartMs, durationSec, smoothWindow, gradientWindow) {
+  if (!points.length || !durationSec || durationSec <= 0) return [];
+  const endMs = gpxStartMs + durationSec * 1000;
+  const pad = Math.max(smoothWindow, gradientWindow) + 2;
+  const padStart = gpxStartMs - pad * 1000;
+  const padEnd = endMs + pad * 1000;
+  const padded = points.filter(p => p.t >= padStart && p.t <= padEnd);
+  if (!padded.length) return [];
+
+  const cumdist = new Array(padded.length).fill(0);
+  for (let i = 1; i < padded.length; i++) {
+    const a = padded[i - 1], b = padded[i];
+    cumdist[i] = cumdist[i - 1] + (
+      a.lat == null || a.lon == null || b.lat == null || b.lon == null
+        ? 0 : haversineM(a.lat, a.lon, b.lat, b.lon)
+    );
+  }
+
+  const grad = new Array(padded.length).fill(null);
+  for (let i = 0; i < padded.length; i++) {
+    const lo = Math.max(0, i - gradientWindow), hi = Math.min(padded.length - 1, i + gradientWindow);
+    const dDist = cumdist[hi] - cumdist[lo];
+    const eleHi = padded[hi].ele, eleLo = padded[lo].ele;
+    if (dDist > 3 && eleHi != null && eleLo != null) {
+      grad[i] = Math.round((eleHi - eleLo) / dDist * 1000) / 10;
+    }
+  }
+
+  const powerRaw = padded.map(p => p.power);
+  const powerSmoothed = new Array(padded.length).fill(null);
+  for (let i = 0; i < padded.length; i++) {
+    const lo = Math.max(0, i - (smoothWindow - 1));
+    const vals = powerRaw.slice(lo, i + 1).filter(v => v != null && !Number.isNaN(v));
+    powerSmoothed[i] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+  }
+
+  const samples = [];
+  let lastGrad = null;
+  for (let i = 0; i < padded.length; i++) {
+    const p = padded[i];
+    if (!(p.t >= gpxStartMs && p.t <= endMs)) continue;
+    if (grad[i] != null) lastGrad = grad[i];
+    samples.push({
+      t: (p.t - gpxStartMs) / 1000,
+      power: powerRaw[i],
+      power_smoothed: powerSmoothed[i],
+      hr: p.hr,
+      elevation: p.ele,
+      gradient: lastGrad,
+      lat: p.lat,
+      lon: p.lon,
+    });
+  }
+  return samples;
+}
+
+function sampleAt(samples, videoT) {
+  if (!samples.length) return null;
+  let lo = 0, hi = samples.length - 1;
+  if (videoT <= samples[0].t) return samples[0];
+  if (videoT >= samples[hi].t) return samples[hi];
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (samples[mid].t < videoT) lo = mid + 1; else hi = mid;
+  }
+  if (lo > 0 && Math.abs(samples[lo - 1].t - videoT) <= Math.abs(samples[lo].t - videoT)) return samples[lo - 1];
+  return samples[lo];
+}
+
+function calibrateOffset(points, baseStartMs, durationSec, smoothWindow, gradientWindow, targets, searchWindow) {
+  let best = null;
+  for (let shift = -searchWindow; shift <= searchWindow; shift++) {
+    const candidateStart = baseStartMs + shift * 1000;
+    const samples = buildSamples(points, candidateStart, durationSec, smoothWindow, gradientWindow);
+    if (!samples.length) continue;
+    const errs = [];
+    for (const [vt, watts] of targets) {
+      const s = sampleAt(samples, vt);
+      if (s && s.power_smoothed != null) errs.push(Math.abs(s.power_smoothed - watts));
+    }
+    if (errs.length !== targets.length) continue;
+    const avg = errs.reduce((a, b) => a + b, 0) / errs.length;
+    if (!best || avg < best.avg) best = { shift, avg, start: candidateStart };
+  }
+  return best;
+}
+
+// ------------------------------------------------------------------ time --
+
+function parseTimecode(s) {
+  s = s.trim();
+  if (!s.includes(":")) return parseFloat(s);
+  const parts = s.split(":").map(Number);
+  let secs = 0;
+  for (const p of parts) secs = secs * 60 + p;
+  return secs;
+}
+
+// --------------------------------------------------------------- drawing --
+
+function drawHeart(c, x0, y0, x1, y1) {
+  const w = x1 - x0, h = y1 - y0;
+  const r = w / 4, cy = y0 + h * 0.32, cx1 = x0 + w / 4, cx2 = x0 + 3 * w / 4;
+  c.beginPath(); c.arc(cx1, cy, r, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(cx2, cy, r, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(x0, cy); c.lineTo(x1, cy); c.lineTo(x0 + w / 2, y1); c.closePath(); c.fill();
+}
+
+function drawBolt(c, x0, y0, x1, y1) {
+  const w = x1 - x0, h = y1 - y0;
+  const pts = [[0.62, 0.0], [0.22, 0.55], [0.46, 0.55], [0.12, 1.0], [0.80, 0.42], [0.52, 0.42], [0.62, 0.0]];
+  c.beginPath();
+  pts.forEach(([px, py], i) => {
+    const X = x0 + px * w, Y = y0 + py * h;
+    if (i === 0) c.moveTo(X, Y); else c.lineTo(X, Y);
+  });
+  c.closePath(); c.fill();
+}
+
+function drawMountain(c, x0, y0, x1, y1) {
+  const w = x1 - x0, h = y1 - y0;
+  c.beginPath();
+  c.moveTo(x0, y1); c.lineTo(x0 + w * 0.4, y0 + h * 0.15); c.lineTo(x0 + w * 0.62, y0 + h * 0.5); c.lineTo(x1, y1);
+  c.closePath(); c.fill();
+  c.beginPath();
+  c.moveTo(x0 + w * 0.35, y1); c.lineTo(x0 + w * 0.75, y0); c.lineTo(x1 + w * 0.05, y1);
+  c.closePath(); c.fill();
+}
+
+function drawIncline(c, x0, y0, x1, y1) {
+  const w = x1 - x0, h = y1 - y0;
+  c.beginPath(); c.moveTo(x0, y1); c.lineTo(x1, y1); c.lineTo(x1, y0 + h * 0.28); c.closePath(); c.fill();
+  const ah = h * 0.22, aw = w * 0.16;
+  c.beginPath(); c.moveTo(x1, y0); c.lineTo(x1 - aw, y0 + ah * 0.5); c.lineTo(x1 - aw * 0.15, y0 + ah); c.closePath(); c.fill();
+}
+
+function currentWeightKg() {
+  const w = parseFloat(document.getElementById("weightKg").value);
+  return Number.isFinite(w) && w > 0 ? w : null;
+}
+
+const METRICS = {
+  hr: { icon: drawHeart, unit: "bpm", fmt: s => s.hr != null ? String(Math.round(s.hr)) : null },
+  power: { icon: drawBolt, unit: "W", fmt: s => s.power_smoothed != null ? String(s.power_smoothed) : null },
+  elevation: { icon: drawMountain, unit: "m", fmt: s => s.elevation != null ? String(Math.round(s.elevation)) : null },
+  gradient: {
+    icon: drawIncline, unit: "grade",
+    fmt: s => s.gradient != null ? (s.gradient >= 0 ? "+" : "") + s.gradient.toFixed(1) + "%" : null,
+  },
+  wkg: {
+    icon: drawBolt, unit: "w/kg",
+    fmt: s => {
+      const weightKg = currentWeightKg();
+      return s.power_smoothed != null && weightKg ? (s.power_smoothed / weightKg).toFixed(1) : null;
+    },
+  },
+};
+
+function roundRectPath(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+// -------------------------------------------------------------------- map --
+
+const ACCENT = "#4da6ff";
+
+function initMap() {
+  if (state.map) { state.map.remove(); state.map = null; state.mapMarker = null; }
+  const validPts = state.points.filter(p => p.lat != null && p.lon != null);
+  if (typeof L === "undefined") {
+    log("Leaflet didn't load (no internet?) - the route map is unavailable, everything else still works.");
+    return;
+  }
+  if (!validPts.length) return;
+
+  state.map = L.map("map", { attributionControl: false });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(state.map);
+
+  const latlngs = validPts.map(p => [p.lat, p.lon]);
+  const line = L.polyline(latlngs, { color: ACCENT, weight: 3 }).addTo(state.map);
+  state.map.fitBounds(line.getBounds(), { padding: [16, 16] });
+  state.mapMarker = L.circleMarker(latlngs[0], {
+    radius: 7, color: "#fff", weight: 2, fillColor: ACCENT, fillOpacity: 1,
+  }).addTo(state.map);
+
+  state.map.on("click", e => {
+    const { lat, lng } = e.latlng;
+    const lat0 = lat * Math.PI / 180;
+    let best = null, bestD = Infinity;
+    for (const p of validPts) {
+      const dlat = p.lat - lat, dlon = (p.lon - lng) * Math.cos(lat0);
+      const d = dlat * dlat + dlon * dlon;
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best) onGpxSliderInput((best.t - state.points[0].t) / 1000);
+  });
+}
+
+function updateMapMarker(sample) {
+  if (!state.mapMarker) return;
+  if (sample && sample.lat != null && sample.lon != null) {
+    state.mapMarker.setLatLng([sample.lat, sample.lon]);
+  }
+}
+
+// ------------------------------------------------------------------ chart --
+
+function drawPowerChartBackground() {
+  const canvas = document.getElementById("powerChart");
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  const cctx = canvas.getContext("2d");
+  cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width, H = rect.height;
+  cctx.clearRect(0, 0, W, H);
+
+  if (!state.timeline.length) { state.chartBg = null; state.chartTotalSec = 0; return; }
+
+  const totalSec = state.timeline[state.timeline.length - 1].t || 1;
+  state.chartTotalSec = totalSec;
+  if (!state.chartView.end || state.chartView.end > totalSec) {
+    state.chartView = { start: 0, end: totalSec };
+  }
+  const view = state.chartView;
+  const viewSpan = Math.max(view.end - view.start, 0.001);
+
+  const powers = state.timeline.map(s => s.power_smoothed).filter(v => v != null);
+  const maxP = Math.max(50, ...powers);
+  const pad = 6;
+  const xOf = t => ((t - view.start) / viewSpan) * W;
+  const yOf = p => pad + (H - 2 * pad) * (1 - Math.max(0, p) / maxP);
+
+  cctx.beginPath();
+  state.timeline.forEach((s, i) => {
+    const x = xOf(s.t), y = yOf(s.power_smoothed || 0);
+    if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
+  });
+  cctx.lineTo(W, H); cctx.lineTo(0, H); cctx.closePath();
+  cctx.fillStyle = "rgba(77,166,255,0.22)";
+  cctx.fill();
+
+  cctx.beginPath();
+  state.timeline.forEach((s, i) => {
+    const x = xOf(s.t), y = yOf(s.power_smoothed || 0);
+    if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
+  });
+  cctx.strokeStyle = ACCENT;
+  cctx.lineWidth = 2;
+  cctx.lineJoin = "round";
+  cctx.stroke();
+
+  state.chartBg = cctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function updateChartCursor(rideT) {
+  const canvas = document.getElementById("powerChart");
+  const cctx = canvas.getContext("2d");
+  if (!state.chartBg) { cctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+  cctx.putImageData(state.chartBg, 0, 0);
+  const view = state.chartView;
+  const viewSpan = view.end - view.start;
+  if (rideT == null || !viewSpan) return;
+  if (rideT < view.start || rideT > view.end) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const x = ((rideT - view.start) / viewSpan) * rect.width;
+
+  cctx.save();
+  cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cctx.beginPath();
+  cctx.moveTo(x, 0);
+  cctx.lineTo(x, rect.height);
+  cctx.strokeStyle = "#ffffff";
+  cctx.lineWidth = 1.5;
+  cctx.stroke();
+  cctx.restore();
+}
+
+function chartXToRideT(clientX) {
+  const canvas = document.getElementById("powerChart");
+  const rect = canvas.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const view = state.chartView;
+  return view.start + frac * (view.end - view.start);
+}
+
+function zoomChart(clientX, factor) {
+  if (!state.chartTotalSec) return;
+  const canvas = document.getElementById("powerChart");
+  const rect = canvas.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const view = state.chartView;
+  const anchorT = view.start + frac * (view.end - view.start);
+  let span = (view.end - view.start) * factor;
+  span = Math.max(CHART_MIN_WINDOW_SEC, Math.min(state.chartTotalSec, span));
+  let start = anchorT - frac * span;
+  let end = start + span;
+  if (start < 0) { start = 0; end = span; }
+  if (end > state.chartTotalSec) { end = state.chartTotalSec; start = end - span; }
+  state.chartView = { start, end };
+  drawPowerChartBackground();
+  updateChartCursor(state.previewingGpx
+    ? parseFloat(document.getElementById("gpxSlider").value)
+    : null);
+}
+
+function panChart(deltaSec) {
+  const view = state.chartView;
+  const span = view.end - view.start;
+  let start = view.start + deltaSec;
+  let end = view.end + deltaSec;
+  if (start < 0) { start = 0; end = span; }
+  if (end > state.chartTotalSec) { end = state.chartTotalSec; start = end - span; }
+  state.chartView = { start, end };
+  drawPowerChartBackground();
+  updateChartCursor(state.previewingGpx
+    ? parseFloat(document.getElementById("gpxSlider").value)
+    : null);
+}
+
+function resetChartZoom() {
+  if (!state.chartTotalSec) return;
+  state.chartView = { start: 0, end: state.chartTotalSec };
+  drawPowerChartBackground();
+  updateChartCursor(state.previewingGpx
+    ? parseFloat(document.getElementById("gpxSlider").value)
+    : null);
+}
+
+let chartDragging = false;
+let chartPanning = false;
+let chartPanLastX = 0;
+const powerChartEl = document.getElementById("powerChart");
+
+powerChartEl.addEventListener("pointerdown", e => {
+  if (!state.chartTotalSec) return;
+  if (e.shiftKey) {
+    chartPanning = true;
+    chartPanLastX = e.clientX;
+  } else {
+    chartDragging = true;
+    onGpxSliderInput(chartXToRideT(e.clientX));
+  }
+});
+window.addEventListener("pointermove", e => {
+  if (chartDragging) onGpxSliderInput(chartXToRideT(e.clientX));
+  else if (chartPanning) {
+    const rect = powerChartEl.getBoundingClientRect();
+    const view = state.chartView;
+    const deltaSec = -((e.clientX - chartPanLastX) / rect.width) * (view.end - view.start);
+    chartPanLastX = e.clientX;
+    panChart(deltaSec);
+  }
+});
+window.addEventListener("pointerup", () => { chartDragging = false; chartPanning = false; });
+powerChartEl.addEventListener("wheel", e => {
+  if (!state.chartTotalSec) return;
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 0.8 : 1.25;
+  zoomChart(e.clientX, factor);
+}, { passive: false });
+powerChartEl.addEventListener("dblclick", () => resetChartZoom());
+window.addEventListener("resize", () => { if (state.timeline.length) drawPowerChartBackground(); });
+
+function currentMetrics() {
+  return Array.from(document.querySelectorAll("#metricsList input:checked")).map(el => el.value);
+}
+
+function currentPosition() {
+  return document.getElementById("position").value;
+}
+
+function drawBadge(sample) {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  if (!W || !H) return;
+
+  const metrics = currentMetrics();
+  if (!metrics.length) return;
+  const scale = W / 1376;
+  const pad = 28 * scale, iconSize = 46 * scale, gap = 14 * scale, colGap = 46 * scale, margin = 40 * scale;
+  const valueFont = `bold ${Math.round(40 * scale)}px Arial, sans-serif`;
+  const unitFont = `${Math.round(22 * scale)}px Arial, sans-serif`;
+
+  const items = metrics.map(name => {
+    const spec = METRICS[name];
+    const val = sample ? spec.fmt(sample) : null;
+    return { icon: spec.icon, val: val != null ? val : "--", unit: spec.unit };
+  });
+
+  ctx.font = valueFont;
+  const colWidths = items.map(({ val, unit }) => {
+    const vw = ctx.measureText(val).width;
+    ctx.font = unitFont;
+    const uw = ctx.measureText(unit).width;
+    ctx.font = valueFont;
+    return iconSize + gap + Math.max(vw, uw);
+  });
+
+  const badgeW = pad * 2 + colWidths.reduce((a, b) => a + b, 0) + colGap * (items.length - 1);
+  const badgeH = pad * 2 + iconSize;
+
+  // Native <video> controls are a fixed height in CSS pixels regardless of the
+  // video's native resolution, so convert that clearance into canvas pixels
+  // using the actual on-screen scale rather than the badge's own `scale`.
+  const rect = canvas.getBoundingClientRect();
+  const cssToCanvas = rect.width ? W / rect.width : 1;
+  const controlsClearance = 44 * cssToCanvas;
+
+  let x0, y0;
+  const position = currentPosition();
+  if (position === "bottom-left") { x0 = margin; y0 = H - margin - badgeH - controlsClearance; }
+  else if (position === "bottom-right") { x0 = W - margin - badgeW; y0 = H - margin - badgeH - controlsClearance; }
+  else if (position === "top-left") { x0 = margin; y0 = margin; }
+  else { x0 = W - margin - badgeW; y0 = margin; }
+
+  roundRectPath(ctx, x0, y0, badgeW, badgeH, 24 * scale);
+  ctx.fillStyle = "rgba(0,0,0,0.588)";
+  ctx.fill();
+
+  let cx = x0 + pad;
+  const iconY0 = y0 + (badgeH - iconSize) / 2;
+  ctx.textBaseline = "top";
+  items.forEach(({ icon, val, unit }, idx) => {
+    ctx.fillStyle = "#fff";
+    icon(ctx, cx, iconY0, cx + iconSize, iconY0 + iconSize);
+    const textX = cx + iconSize + gap;
+    ctx.font = valueFont;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(val, textX, y0 + pad);
+    const vH = 40 * scale;
+    ctx.font = unitFont;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillText(unit, textX, y0 + pad + vH);
+    cx += colWidths[idx] + colGap;
+  });
+}
+
+function updateReadout(sample) {
+  document.getElementById("rHr").textContent = sample && sample.hr != null ? Math.round(sample.hr) : "--";
+  document.getElementById("rPower").textContent = sample && sample.power_smoothed != null ? sample.power_smoothed : "--";
+  document.getElementById("rEle").textContent = sample && sample.elevation != null ? Math.round(sample.elevation) : "--";
+  document.getElementById("rGrad").textContent = sample && sample.gradient != null
+    ? (sample.gradient >= 0 ? "+" : "") + sample.gradient.toFixed(1) + "%" : "--";
+}
+
+function renderSample(sample, rideT) {
+  drawBadge(sample);
+  updateReadout(sample);
+  updateMapMarker(sample);
+  updateChartCursor(rideT != null ? rideT : null);
+}
+
+function draw() {
+  state.previewingGpx = false;
+  const sample = state.samples.length ? sampleAt(state.samples, video.currentTime) : null;
+  const rideT = sample && state.points.length
+    ? (effectiveStartMs() + sample.t * 1000 - state.points[0].t) / 1000
+    : null;
+  renderSample(sample, rideT);
+}
+
+function loop() {
+  if (!state.previewingGpx) draw();
+  if (!video.paused && !video.ended) requestAnimationFrame(loop);
+}
+
+function formatGpxTime(sec) {
+  if (!state.points.length) return "";
+  const ms = state.points[0].t + sec * 1000;
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+  const elapsed = `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${new Date(ms).toString().replace(/ \(.+\)$/, "")}  (elapsed ${elapsed})`;
+}
+
+function showGpxPreview(sec) {
+  state.previewingGpx = true;
+  document.getElementById("gpxClockReadout").value = formatGpxTime(sec);
+  const sample = state.timeline.length ? sampleAt(state.timeline, sec) : null;
+  renderSample(sample, sec);
+}
+
+function effectiveStartMs() {
+  return state.baseStartMs == null ? null : state.baseStartMs + state.nudgeSec * 1000;
+}
+
+function rebuildAndDraw() {
+  const startMs = effectiveStartMs();
+  const resolvedField = document.getElementById("resolvedStart");
+  if (startMs == null || !state.points.length || !video.duration || Number.isNaN(video.duration)) {
+    state.samples = [];
+    resolvedField.value = "";
+    draw();
+    return;
+  }
+  state.samples = buildSamples(state.points, startMs, video.duration, SMOOTH_WINDOW, GRADIENT_WINDOW);
+  resolvedField.value = new Date(startMs).toISOString();
+  draw();
+  if (!state.samples.length) {
+    log(`Warning: no GPX data found in that window (video is ${video.duration.toFixed(1)}s long).`);
+  }
+}
+
+// ----------------------------------------------------------------- wiring --
+
+document.getElementById("videoFile").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.videoFile = file;
+  video.src = URL.createObjectURL(file);
+  document.getElementById("videoPathField").value = file.name;
+  const outField = document.getElementById("outPathField");
+  if (!outField.value) {
+    outField.value = file.name.replace(/\.[^.]+$/, "") + "_overlay.mp4";
+  }
+  video.addEventListener("loadedmetadata", function onMeta() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    log(`Video loaded: ${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(1)}s`);
+    rebuildAndDraw();
+    video.removeEventListener("loadedmetadata", onMeta);
+  });
+});
+
+document.getElementById("gpxFile").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.gpxFile = file;
+  document.getElementById("gpxPathField").value = file.name;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      state.points = parseGPX(reader.result);
+      log(`Loaded ${state.points.length} GPX points `
+        + (state.points.length ? `(${new Date(state.points[0].t).toISOString()} .. ${new Date(state.points[state.points.length - 1].t).toISOString()})` : ""));
+
+      const totalSec = state.points.length
+        ? Math.round((state.points[state.points.length - 1].t - state.points[0].t) / 1000)
+        : 0;
+      state.timeline = totalSec > 0 ? buildSamples(state.points, state.points[0].t, totalSec, SMOOTH_WINDOW, GRADIENT_WINDOW) : [];
+
+      const slider = document.getElementById("gpxSlider");
+      const sliderSec = document.getElementById("gpxSliderSec");
+      slider.max = sliderSec.max = totalSec;
+      slider.value = sliderSec.value = 0;
+      slider.disabled = sliderSec.disabled = totalSec <= 0;
+      document.getElementById("setAnchorBtn").disabled = totalSec <= 0;
+
+      state.baseStartMs = null; // a new GPX file invalidates any previous anchor
+      state.chartView = { start: 0, end: 0 }; // a new GPX file resets any chart zoom
+      initMap();
+      drawPowerChartBackground();
+      rebuildAndDraw();
+      showGpxPreview(0);
+    } catch (err) {
+      log("Error parsing GPX: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+function onGpxSliderInput(sec) {
+  document.getElementById("gpxSlider").value = sec;
+  document.getElementById("gpxSliderSec").value = sec;
+  showGpxPreview(sec);
+}
+
+document.getElementById("gpxSlider").addEventListener("input", e => onGpxSliderInput(parseFloat(e.target.value)));
+document.getElementById("gpxSliderSec").addEventListener("input", e => {
+  const max = parseFloat(e.target.max) || 0;
+  let sec = parseFloat(e.target.value);
+  if (Number.isNaN(sec)) return;
+  sec = Math.max(0, Math.min(max, sec));
+  onGpxSliderInput(sec);
+});
+
+document.getElementById("setAnchorBtn").addEventListener("click", () => {
+  if (!state.points.length) { log("Load a GPX file first."); return; }
+  if (!video.duration || Number.isNaN(video.duration)) { log("Load a video first."); return; }
+  const gpxSec = parseFloat(document.getElementById("gpxSlider").value);
+  const gpxMs = state.points[0].t + gpxSec * 1000;
+  state.baseStartMs = gpxMs - video.currentTime * 1000;
+  state.nudgeSec = 0;
+  document.getElementById("nudge").value = 0;
+  document.getElementById("nudgeVal").textContent = "0.0s";
+  rebuildAndDraw();
+  log(`Anchor set: video ${video.currentTime.toFixed(1)}s ↔ GPX ${formatGpxTime(gpxSec)}`);
+});
+
+document.getElementById("nudge").addEventListener("input", e => {
+  state.nudgeSec = parseFloat(e.target.value);
+  document.getElementById("nudgeVal").textContent = state.nudgeSec.toFixed(1) + "s";
+  rebuildAndDraw();
+});
+
+document.querySelectorAll("#metricsList input, #position").forEach(el => {
+  el.addEventListener("change", () => {
+    if (state.previewingGpx) showGpxPreview(parseFloat(document.getElementById("gpxSlider").value));
+    else draw();
+  });
+});
+
+document.getElementById("weightKg").addEventListener("input", () => {
+  if (state.previewingGpx) showGpxPreview(parseFloat(document.getElementById("gpxSlider").value));
+  else draw();
+});
+
+function addCalibRow(vt = "", watts = "") {
+  const row = document.createElement("div");
+  row.className = "calib-row";
+  row.innerHTML = `
+    <input type="text" placeholder="video time e.g. 0:50" class="calib-vt" value="${vt}">
+    <input type="number" placeholder="watts e.g. 369" class="calib-w" value="${watts}">
+    <button type="button" class="secondary remove-row">&times;</button>
+  `;
+  row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+  document.getElementById("calibRows").appendChild(row);
+}
+addCalibRow("0:50", "369");
+addCalibRow("2:58", "384");
+addCalibRow("3:16", "414");
+document.getElementById("addCalibRowBtn").addEventListener("click", () => addCalibRow());
+
+document.getElementById("calibrateBtn").addEventListener("click", () => {
+  const calibStatus = document.getElementById("calibStatus");
+  if (state.baseStartMs == null) { calibStatus.textContent = "Set an anchor first."; return; }
+  if (!state.points.length || !video.duration) { calibStatus.textContent = "Load a video and GPX first."; return; }
+
+  const targets = [];
+  for (const row of document.querySelectorAll(".calib-row")) {
+    const vtStr = row.querySelector(".calib-vt").value;
+    const wStr = row.querySelector(".calib-w").value;
+    if (!vtStr || !wStr) continue;
+    const vt = parseTimecode(vtStr), w = parseFloat(wStr);
+    if (!Number.isNaN(vt) && !Number.isNaN(w)) targets.push([vt, w]);
+  }
+  if (!targets.length) { calibStatus.textContent = "Add at least one (video time, watts) reading."; return; }
+
+  const best = calibrateOffset(state.points, state.baseStartMs, video.duration, SMOOTH_WINDOW, GRADIENT_WINDOW, targets, 30);
+  if (!best) { calibStatus.textContent = "Could not calibrate - no GPX data found near the anchor."; return; }
+
+  state.baseStartMs = best.start;
+  state.nudgeSec = 0;
+  document.getElementById("nudge").value = 0;
+  document.getElementById("nudgeVal").textContent = "0.0s";
+  calibStatus.textContent = `Shifted sync by ${best.shift >= 0 ? "+" : ""}${best.shift}s (avg error ${best.avg.toFixed(1)}W)`;
+  rebuildAndDraw();
+});
+
+document.getElementById("copyCmdBtn").addEventListener("click", () => {
+  const resolved = document.getElementById("resolvedStart").value;
+  if (!resolved) { log("No resolved sync yet - set an anchor first."); return; }
+  const videoPath = document.getElementById("videoPathField").value || "ride.mov";
+  const gpxPath = document.getElementById("gpxPathField").value || "ride.gpx";
+  const outPath = document.getElementById("outPathField").value || "ride_overlay.mp4";
+  const metricsArr = currentMetrics();
+  const metrics = metricsArr.join(",");
+  const position = currentPosition();
+  const weightKg = currentWeightKg();
+  if (metricsArr.includes("wkg") && !weightKg) {
+    log("Enter a rider weight (kg) to use the W/kg metric.");
+    return;
+  }
+  let cmd = `python3 ride_overlay.py --video "${videoPath}" --gpx "${gpxPath}" `
+    + `--gpx-start "${resolved}" --metrics ${metrics} --position ${position} --out "${outPath}"`;
+  if (metricsArr.includes("wkg")) cmd += ` --weight-kg ${weightKg}`;
+  const cmdOut = document.getElementById("cmdOut");
+  cmdOut.value = cmd;
+  navigator.clipboard.writeText(cmd).then(
+    () => log("Command copied to clipboard."),
+    () => { cmdOut.select(); log("Clipboard access blocked - command selected, copy manually (Cmd/Ctrl+C)."); }
+  );
+});
+
+video.addEventListener("play", () => requestAnimationFrame(loop));
+video.addEventListener("seeked", draw);
+video.addEventListener("timeupdate", draw);
+</script>
+</body>
+</html>

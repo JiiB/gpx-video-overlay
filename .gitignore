@@ -1,0 +1,7 @@
+# Personal ride data & rendered videos — not part of the tool, never published
+/samples/
+
+# OS / editor cruft
+.DS_Store
+__pycache__/
+*.pyc
