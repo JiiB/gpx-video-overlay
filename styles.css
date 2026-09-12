@@ -413,6 +413,29 @@ footer {
   font-size: 12px;
 }
 
+.footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.footer-github {
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.footer-github:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footer-github:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .load-strip-title .status-dot {
   width: 5px;
   height: 5px;
@@ -1264,6 +1287,12 @@ footer {
   footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .footer-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 
