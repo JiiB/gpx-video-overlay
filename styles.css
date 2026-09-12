@@ -136,6 +136,7 @@ footer {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr);
+  max-width: 1180px;
   align-items: center;
   gap: clamp(40px, 8vw, 140px);
   min-height: calc(100svh - 100px);
