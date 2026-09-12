@@ -10,9 +10,27 @@ from a GPX file onto a ride video:
 
 This repo is set up to be served directly as a static site (e.g. GitHub
 Pages) — `index.html` at the root is the whole preview tool, no build step.
-A local `samples/` folder (git-ignored) is just a scratch space for your own
-ride videos/GPX files while testing; nothing in it is required to use either
-tool.
+
+## Local ride data
+
+Put your video and matching GPX file in [`data/`](data/) for the simplest
+workflow:
+
+```text
+data/
+├── ride.mov
+├── ride.gpx
+└── ride_overlay.mp4  # created after rendering
+```
+
+The folder's contents are ignored by Git, apart from its README and
+`.gitkeep`. Common GPX and video extensions are also ignored repository-wide,
+so personal ride footage and telemetry cannot be committed accidentally.
+
+Both relative and absolute paths work with `--video`, `--gpx`, and `--out`.
+If `--out` is omitted, the CLI saves the result beside the input video using
+an `_overlay.mp4` suffix. For example, `--video data/ride.mov` defaults to
+`data/ride_overlay.mp4`.
 
 ## Requirements
 
@@ -39,9 +57,8 @@ corresponds to. Two ways to find that:
 ### 2. Render with a rough sync guess
 
 ```
-python3 ride_overlay.py --video ride.mov --gpx ride.gpx \
-    --sync "0:36=2026-08-22T13:56:20+02:00" \
-    --out ride_overlay.mp4
+python3 ride_overlay.py --video data/ride.mov --gpx data/ride.gpx \
+    --sync "0:36=2026-08-22T13:56:20+02:00"
 ```
 
 `--sync VIDEO_TIME=REAL_TIME` means "this point in the video is this
@@ -51,7 +68,7 @@ real-world clock time" — `VIDEO_TIME` accepts seconds, `M:SS`, or `H:MM:SS`;
 ### 3. Check it before committing to a full render
 
 ```
-python3 ride_overlay.py --video ride.mov --gpx ride.gpx \
+python3 ride_overlay.py --video data/ride.mov --gpx data/ride.gpx \
     --sync "0:36=2026-08-22T13:56:20+02:00" \
     --probe "0:50,2:58,3:16"
 ```
@@ -68,10 +85,10 @@ the tool can search for the offset that best matches those readings — useful
 for correcting small clock drift the rough sync above can't catch:
 
 ```
-python3 ride_overlay.py --video ride.mov --gpx ride.gpx \
+python3 ride_overlay.py --video data/ride.mov --gpx data/ride.gpx \
     --sync "0:36=2026-08-22T13:56:20+02:00" \
     --calibrate-power "0:50=369,2:58=384,3:16=414" \
-    --out ride_overlay.mp4
+    --out data/ride_overlay.mp4
 ```
 
 It searches ± `--calibrate-window` seconds (default 30) around your rough
@@ -120,6 +137,12 @@ tile servers reject requests with no `Referer` header, which is what a
    with the resolved sync (and `--weight-kg` if W/kg is enabled) baked in,
    and run that to produce the actual overlaid video file.
 
+   For privacy, browsers do not expose a selected file's absolute filesystem
+   path. The page therefore fills the input path fields with filenames only.
+   If an input is not beside `ride_overlay.py`, paste its absolute path into
+   the corresponding field before copying the command. The generated output
+   path defaults to `data/<video-name>_overlay.mp4` and remains editable.
+
 ## Flag reference
 
 Run `python3 ride_overlay.py --help` for the full, current list. Summary:
@@ -128,7 +151,7 @@ Run `python3 ride_overlay.py --help` for the full, current list. Summary:
 |---|---|
 | `--video PATH` | input video (required) |
 | `--gpx PATH` | GPX telemetry source (required) |
-| `--out PATH` | output video (default: `<video>_overlay.mp4`) |
+| `--out PATH` | output video (default: beside the input video as `<video>_overlay.mp4`) |
 | `--sync VIDEO_TIME=REAL_TIME` | rough sync anchor |
 | `--gpx-start ISO_TIMESTAMP` | exact UTC time in the GPX that video 0:00 corresponds to (alternative to `--sync`) |
 | `--calibrate-power VIDEO_TIME=WATTS[,...]` | auto fine-tune sync from known power readings |

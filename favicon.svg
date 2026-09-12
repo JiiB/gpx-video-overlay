@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#09070f"/>
+  <circle
+    cx="32"
+    cy="32"
+    r="17"
+    fill="none"
+    stroke="#8f67ff"
+    stroke-width="10"
+    stroke-dasharray="80 27"
+    transform="rotate(18 32 32)"
+  />
+</svg>

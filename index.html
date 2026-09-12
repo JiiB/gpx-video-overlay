@@ -2,236 +2,280 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>GPX video overlay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#09070f">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<title>GPX Video Overlay Tool | Sync Cycling Data &amp; Video</title>
+<meta name="description" content="Sync GPX cycling data with video in your browser. Preview power, heart rate, elevation and gradient overlays, then render locally. Free and private.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="application-name" content="GPX Video Overlay">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="GPX Video Overlay">
+<meta property="og:title" content="GPX Video Overlay Tool | Sync Cycling Data &amp; Video">
+<meta property="og:description" content="Sync GPX cycling data with video in your browser. Preview power, heart rate, elevation and gradient overlays, then render locally. Free and private.">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="GPX Video Overlay Tool | Sync Cycling Data &amp; Video">
+<meta name="twitter:description" content="Sync GPX cycling data with video in your browser. Preview power, heart rate, elevation and gradient overlays, then render locally. Free and private.">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "GPX Video Overlay",
+  "description": "Sync GPX cycling data with video in your browser. Preview power, heart rate, elevation and gradient overlays, then render locally. Free and private.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Any",
+  "browserRequirements": "Requires a modern web browser with JavaScript enabled",
+  "isAccessibleForFree": true,
+  "featureList": [
+    "Synchronize GPX telemetry with cycling video",
+    "Preview power, heart rate, elevation and gradient overlays",
+    "Keep video and GPX files on the user's device",
+    "Generate a local video-rendering command"
+  ]
+}
+</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-  :root {
-    color-scheme: dark;
-    --bg: #14161a;
-    --panel: #1c1f26;
-    --border: #2c313c;
-    --text: #e8eaed;
-    --dim: #9aa2ad;
-    --accent: #4da6ff;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    padding: 20px;
-  }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  p.sub { color: var(--dim); margin: 0 0 20px; }
-  .layout { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
-  .stage { flex: 1 1 420px; min-width: 280px; max-width: 640px; }
-  .video-wrap { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
-  .video-wrap video { display: block; width: 100%; height: auto; }
-  .video-wrap canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-  .panel { flex: 1 1 380px; min-width: 300px; display: flex; flex-direction: column; gap: 16px; }
-  fieldset {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px 14px;
-    background: var(--panel);
-  }
-  legend { padding: 0 6px; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  label { display: block; font-size: 12px; color: var(--dim); margin: 8px 0 3px; }
-  label:first-child { margin-top: 0; }
-  input[type=text], input[type=number], input[type=file], select, textarea {
-    width: 100%;
-    background: #101216;
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 5px;
-    padding: 6px 8px;
-    font: inherit;
-  }
-  textarea { resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
-  .row { display: flex; gap: 8px; align-items: flex-end; }
-  .row > * { flex: 1; }
-  button {
-    background: var(--accent);
-    color: #06202f;
-    border: none;
-    border-radius: 5px;
-    padding: 7px 12px;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button.secondary { background: #2c313c; color: var(--text); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  .calib-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
-  .calib-row input { flex: 1; }
-  .calib-row button { flex: 0 0 auto; padding: 6px 9px; }
-  details.fieldset-details {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0 14px 0;
-    background: var(--panel);
-  }
-  details.fieldset-details[open] { padding-bottom: 14px; }
-  details.fieldset-details > summary {
-    padding: 12px 0;
-    margin: 0;
-    color: var(--dim);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    cursor: pointer;
-    user-select: none;
-    list-style: none;
-  }
-  details.fieldset-details > summary::-webkit-details-marker { display: none; }
-  details.fieldset-details > summary::before { content: "\25b8  "; }
-  details.fieldset-details[open] > summary::before { content: "\25be  "; }
-  .calib-help-text { color: var(--dim); font-size: 12.5px; margin: 0 0 8px; }
-  .readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .readout div { background: #101216; border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center; }
-  .readout .val { font-size: 18px; font-weight: 700; }
-  .readout .lbl { font-size: 11px; color: var(--dim); text-transform: uppercase; }
-  .status { font-size: 12px; color: var(--dim); white-space: pre-wrap; }
-  .metrics-list { display: flex; gap: 12px; flex-wrap: wrap; }
-  .metrics-list label { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text); margin: 0; }
-  code.inline { background: #101216; padding: 1px 5px; border-radius: 4px; }
-  #map { height: 240px; border-radius: 8px; margin-top: 12px; background: #101216; }
-  #powerChart {
-    display: block;
-    width: 100%;
-    height: 120px;
-    margin-top: 10px;
-    border-radius: 8px;
-    background: #101216;
-    border: 1px solid var(--border);
-    cursor: crosshair;
-    touch-action: none;
-  }
-  .chart-lbl { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 0; }
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<header class="hero">
+  <nav class="hero-nav" aria-label="Primary navigation">
+    <a class="brand" href="#top" aria-label="GPX Video Overlay home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      GPX Video Overlay
+    </a>
+    <span class="privacy-note"><span class="status-dot"></span> Your files stay on this device</span>
+  </nav>
 
-<h1>GPX video overlay</h1>
-<p class="sub">Load a video + GPX from the same ride, dial in the sync offset visually, then copy the matching
-  <code class="inline">ride_overlay.py</code> command to render the real overlaid video. This page does not export
-  or upload anything &mdash; everything else happens locally in the browser, but the route map below needs internet
-  (it loads Leaflet and OpenStreetMap tiles from the network).</p>
+  <div class="hero-content" id="top">
+    <div class="hero-copy">
+      <p class="eyebrow">GPX + VIDEO TELEMETRY</p>
+      <h1>Make every effort<br><em>visible.</em></h1>
+      <p class="hero-lede">Match your ride footage to its GPX timeline, preview the data overlay, then copy a render-ready command to run locally with <code class="inline">ride_overlay.py</code>.</p>
+      <p class="local-note"><span class="status-dot"></span>Nothing is uploaded. Your video and ride data stay in your browser.</p>
+      <div class="hero-actions">
+        <a class="hero-cta" href="#workspace">Open the sync studio <span aria-hidden="true">&darr;</span></a>
+        <a class="github-cta" href="https://github.com/JiiB/gpx-video-overlay" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.64 0 8.13c0 3.59 2.29 6.64 5.47 7.71.4.08.55-.18.55-.39 0-.19-.01-.83-.01-1.5-2.01.38-2.53-.5-2.69-.96-.09-.23-.48-.96-.82-1.15-.28-.15-.68-.53-.01-.54.63-.01 1.08.59 1.23.83.72 1.23 1.87.88 2.33.67.07-.53.28-.88.51-1.08-1.78-.21-3.64-.91-3.64-4.02 0-.89.31-1.62.82-2.19-.08-.21-.36-1.04.08-2.16 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.89c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.12.16 1.95.08 2.16.51.57.82 1.3.82 2.19 0 3.12-1.87 3.81-3.65 4.02.29.25.54.74.54 1.51 0 1.09-.01 1.97-.01 2.25 0 .22.15.47.55.39A8.14 8.14 0 0 0 16 8.13C16 3.64 12.42 0 8 0Z"/>
+          </svg>
+          Clone on GitHub
+        </a>
+      </div>
+      <p class="repo-note"><strong>Sync here, render locally.</strong> This page aligns your video with its GPX data. Clone the repository for the renderer, setup steps, and full instructions.</p>
+    </div>
 
-<div class="layout">
-  <div class="stage">
-    <div class="video-wrap">
-      <video id="video" controls playsinline></video>
-      <canvas id="canvas"></canvas>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="visual-topline"><span>LIVE RIDE</span><span>06:42:18</span></div>
+      <svg class="route-line" viewBox="0 0 520 360" fill="none">
+        <path class="route-shadow" d="M34 292C83 255 111 284 147 244C181 207 155 164 204 142C258 118 277 179 325 146C367 117 343 73 402 56C439 45 473 67 493 29"/>
+        <path class="route-path" d="M34 292C83 255 111 284 147 244C181 207 155 164 204 142C258 118 277 179 325 146C367 117 343 73 402 56C439 45 473 67 493 29"/>
+      </svg>
+      <div class="visual-metrics">
+        <div><strong>286</strong><span>WATTS</span></div>
+        <div><strong>158</strong><span>BPM</span></div>
+        <div><strong>8.4</strong><span>GRADE %</span></div>
+      </div>
+      <div class="visual-pulse"></div>
     </div>
-    <div class="readout" style="margin-top:12px">
-      <div><div class="val" id="rHr">--</div><div class="lbl">bpm</div></div>
-      <div><div class="val" id="rPower">--</div><div class="lbl">W (3s avg)</div></div>
-      <div><div class="val" id="rEle">--</div><div class="lbl">m</div></div>
-      <div><div class="val" id="rGrad">--</div><div class="lbl">grade</div></div>
-    </div>
-    <div class="status" id="status"></div>
-    <p class="chart-lbl">Route (click to jump the GPX slider there)</p>
-    <div id="map"></div>
-    <p class="chart-lbl">Power, whole ride (click/drag to jump the GPX slider &middot; scroll to zoom &middot; shift+drag to pan &middot; double-click to reset zoom)</p>
-    <canvas id="powerChart"></canvas>
   </div>
 
-  <div class="panel">
-    <fieldset>
-      <legend>1. Load files</legend>
-      <label for="videoFile">Video file</label>
-      <input type="file" id="videoFile" accept="video/*">
-      <label for="gpxFile">GPX file</label>
-      <input type="file" id="gpxFile" accept=".gpx">
-    </fieldset>
+  <div class="scroll-cue" aria-hidden="true"><span></span>SCROLL TO SYNC</div>
+</header>
 
-    <fieldset>
-      <legend>2. Anchor sync</legend>
-      <p class="status" style="margin:0 0 8px">Position the video where you like with its own controls (pause on a
-        frame you recognize), then drag this slider through the GPX file until the badge above matches that frame,
-        then hit the button.</p>
-      <label for="gpxSlider">GPX time</label>
-      <input type="range" id="gpxSlider" min="0" max="0" step="1" value="0" style="width:100%" disabled>
-      <div class="row" style="margin-top:6px">
-        <div>
-          <label for="gpxSliderSec">Elapsed since GPX start (s)</label>
-          <input type="number" id="gpxSliderSec" min="0" max="0" step="1" value="0" disabled>
-        </div>
-        <div>
-          <label>Clock time</label>
-          <input type="text" id="gpxClockReadout" readonly>
-        </div>
+<main>
+  <section class="workspace" id="workspace" aria-labelledby="workspaceTitle">
+    <div class="workspace-head">
+      <div>
+        <p class="eyebrow">SYNC STUDIO</p>
+        <h2 id="workspaceTitle">Align the ride.</h2>
       </div>
-      <button id="setAnchorBtn" style="margin-top:10px" disabled>Set anchor: this GPX moment &harr; current video frame</button>
-    </fieldset>
-
-    <details class="fieldset-details">
-      <summary>3. Auto-calibrate from known power (optional)</summary>
-      <p class="calib-help-text">The anchor above gets you roughly in sync, but small clock drift between the video
-        and the GPX file can still leave things off by a second or two. If you filmed your cycling computer's screen
-        at a few moments during the ride, you can use those as ground truth: enter the video timestamp and the power
-        value you can read on screen at that moment for a couple of readings, then hit Auto-calibrate &mdash; it
-        searches nearby offsets for the one that best matches the power the GPX file reports at those times.</p>
-      <p class="calib-help-text">Example: at <code class="inline">0:50</code> into the video your bike computer shows
-        <code class="inline">369W</code>, and at <code class="inline">2:58</code> it shows <code
-          class="inline">384W</code>. Enter those two rows and calibrate &mdash; this is entirely optional, skip it
-        if you don't have footage of your computer or the anchor already looks accurate.</p>
-      <div id="calibRows"></div>
-      <button class="secondary" id="addCalibRowBtn" type="button">+ add reading</button>
-      <button id="calibrateBtn" style="margin-left:8px">Auto-calibrate</button>
-      <div class="status" id="calibStatus"></div>
-    </details>
-
-    <fieldset>
-      <legend>4. Nudge</legend>
-      <label for="nudge">Manual adjustment: <span id="nudgeVal">0.0s</span></label>
-      <input type="range" id="nudge" min="-30" max="30" step="0.5" value="0" style="width:100%">
-    </fieldset>
-
-    <fieldset>
-      <legend>Badge options</legend>
-      <div class="metrics-list" id="metricsList">
-        <label><input type="checkbox" value="hr" checked> Heart rate</label>
-        <label><input type="checkbox" value="power" checked> Power</label>
-        <label><input type="checkbox" value="wkg"> W/kg</label>
-        <label><input type="checkbox" value="elevation" checked> Elevation</label>
-        <label><input type="checkbox" value="gradient" checked> Gradient</label>
+      <div class="workspace-head-actions">
+        <p class="workspace-intro">Load both files, pause the video, then move the GPX timeline to the same moment.</p>
+        <a class="more-settings-link" href="#finish">More settings &amp; render <span aria-hidden="true">&darr;</span></a>
       </div>
-      <label for="weightKg" style="margin-top:10px">Weight in kilo (needed for W/kg)</label>
-      <input type="number" id="weightKg" min="1" step="0.1" placeholder="e.g. 75">
-      <label for="position" style="margin-top:10px">Position</label>
-      <select id="position">
-        <option value="bottom-left" selected>Bottom left</option>
-        <option value="bottom-right">Bottom right</option>
-        <option value="top-left">Top left</option>
-        <option value="top-right">Top right</option>
-      </select>
-    </fieldset>
+    </div>
 
-    <fieldset>
-      <legend>5. Render command</legend>
-      <div class="row">
-        <div>
-          <label for="videoPathField">Video path (as you'll run the CLI)</label>
-          <input type="text" id="videoPathField" placeholder="ride.mov">
+    <div class="dashboard-grid">
+      <section class="card load-strip" aria-labelledby="loadTitle">
+        <div class="load-strip-title">
+          <h3 id="loadTitle"><span class="card-index">01</span> Load your files</h3>
+          <p><span class="status-dot"></span>Read locally, never uploaded</p>
         </div>
-        <div>
-          <label for="gpxPathField">GPX path</label>
-          <input type="text" id="gpxPathField" placeholder="ride.gpx">
+        <div class="file-grid">
+          <div>
+            <label class="file-control" for="videoFile"><span>Video</span><strong>MOV / MP4</strong></label>
+            <input type="file" id="videoFile" accept="video/*">
+          </div>
+          <div>
+            <label class="file-control" for="gpxFile"><span>Ride data</span><strong>GPX</strong></label>
+            <input type="file" id="gpxFile" accept=".gpx">
+          </div>
         </div>
+      </section>
+
+      <section class="card preview-card" aria-labelledby="previewTitle">
+        <div class="card-head">
+          <h3 id="previewTitle"><span class="card-index">02</span> Video preview</h3>
+          <span class="live-pill"><span></span> Local preview</span>
+        </div>
+        <div class="video-wrap">
+          <video id="video" controls playsinline></video>
+          <canvas id="canvas"></canvas>
+          <div class="video-empty">
+            <span class="empty-icon" aria-hidden="true">&#9654;</span>
+            <strong>Your ride will appear here</strong>
+            <span>Choose a video to begin</span>
+          </div>
+        </div>
+        <div class="readout" aria-label="Current telemetry values">
+          <div><div class="val" id="rHr">--</div><div class="lbl">Heart rate <span>bpm</span></div></div>
+          <div><div class="val" id="rPower">--</div><div class="lbl">Power <span>3s avg</span></div></div>
+          <div><div class="val" id="rEle">--</div><div class="lbl">Elevation <span>m</span></div></div>
+          <div><div class="val" id="rGrad">--</div><div class="lbl">Gradient <span>%</span></div></div>
+        </div>
+      </section>
+
+      <section class="card sync-card" aria-labelledby="syncTitle">
+        <div class="card-head">
+          <h3 id="syncTitle"><span class="card-index">03</span> Anchor sync</h3>
+          <span class="micro-hint auto-hint"><span class="status-dot"></span>Updates automatically</span>
+        </div>
+        <div class="sync-card-body">
+          <p class="control-help">Pause on a recognizable video frame. As you move the GPX timeline, that moment becomes the new sync anchor automatically.</p>
+          <div class="range-heading">
+            <label for="gpxSlider">GPX time</label>
+            <span>Drag to match the frame</span>
+          </div>
+          <input type="range" id="gpxSlider" min="0" max="0" step="1" value="0" disabled>
+          <div class="time-grid">
+            <div>
+              <label for="gpxSliderSec">Elapsed seconds</label>
+              <input type="number" id="gpxSliderSec" min="0" max="0" step="1" value="0" disabled>
+            </div>
+            <div>
+              <label for="gpxClockReadout">GPX clock</label>
+              <input type="text" id="gpxClockReadout" readonly>
+            </div>
+          </div>
+        </div>
+        <div class="nudge-inline">
+          <div class="range-heading">
+            <label for="nudge"><span class="card-index">04</span> Fine tune</label>
+            <output id="nudgeVal" for="nudge">0.0s</output>
+          </div>
+          <input type="range" id="nudge" min="-30" max="30" step="0.5" value="0">
+          <div class="range-scale"><span>-30s</span><span>0</span><span>+30s</span></div>
+        </div>
+        <div class="sync-alt-hint">
+          <div>
+            <strong>Two more ways to sync</strong>
+            <span>Click the route map or drag across the power chart below.</span>
+          </div>
+          <span class="down-arrow" aria-hidden="true">&darr;</span>
+        </div>
+        <div class="status-shell" aria-live="polite">
+          <span class="status-dot"></span>
+          <div class="status" id="status">Waiting for a video and GPX file.</div>
+        </div>
+      </section>
+
+      <section class="card data-card map-card" aria-labelledby="mapTitle">
+        <div class="card-head">
+          <h3 id="mapTitle"><span class="card-index">05</span> Route</h3>
+          <span class="micro-hint">Click to seek &amp; sync</span>
+        </div>
+        <div id="map"></div>
+      </section>
+
+      <section class="card data-card chart-card" aria-labelledby="chartTitle">
+        <div class="card-head">
+          <h3 id="chartTitle"><span class="card-index">06</span> Power</h3>
+          <span class="micro-hint">Drag to seek &amp; sync</span>
+        </div>
+        <canvas id="powerChart" title="Scroll to zoom, shift-drag to pan, double-click to reset"></canvas>
+        <p class="chart-help">Scroll to zoom &middot; Shift + drag to pan &middot; Double-click to reset</p>
+      </section>
+    </div>
+  </section>
+
+  <section class="finish-section" id="finish" aria-labelledby="finishTitle">
+    <div class="finish-head">
+      <div>
+        <p class="eyebrow">OPTIONAL DETAILS</p>
+        <h2 id="finishTitle">Refine, style, render.</h2>
       </div>
-      <label for="outPathField">Output path</label>
-      <input type="text" id="outPathField" placeholder="ride_overlay.mp4">
-      <label for="resolvedStart" style="margin-top:10px">Resolved sync (--gpx-start)</label>
-      <input type="text" id="resolvedStart" readonly>
-      <button id="copyCmdBtn" style="margin-top:10px">Copy CLI command</button>
-      <textarea id="cmdOut" rows="3" readonly style="margin-top:8px"></textarea>
-    </fieldset>
-  </div>
-</div>
+      <p>Fine-tune the overlay, copy the generated command, then run it locally. This page never uploads or renders your files.</p>
+    </div>
+
+    <div class="finish-grid">
+      <fieldset class="card settings-card">
+        <legend><span class="card-index">07</span> Overlay style</legend>
+        <label class="field-label">Visible metrics</label>
+        <div class="metrics-list" id="metricsList">
+          <label><input type="checkbox" value="hr" checked><span>Heart rate</span></label>
+          <label><input type="checkbox" value="power" checked><span>Power</span></label>
+          <label><input type="checkbox" value="wkg"><span>W/kg</span></label>
+          <label><input type="checkbox" value="elevation" checked><span>Elevation</span></label>
+          <label><input type="checkbox" value="gradient" checked><span>Gradient</span></label>
+        </div>
+        <div class="row option-row">
+          <div>
+            <label for="weightKg">Weight in kg <span>(for W/kg)</span></label>
+            <input type="number" id="weightKg" min="1" step="0.1" placeholder="75">
+          </div>
+          <div>
+            <label for="position">Badge position</label>
+            <select id="position">
+              <option value="bottom-left" selected>Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+              <option value="top-left">Top left</option>
+              <option value="top-right">Top right</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="card render-card">
+        <legend><span class="card-index">08</span> Render command</legend>
+        <div class="row">
+          <div>
+            <label for="videoPathField">Video path</label>
+            <input type="text" id="videoPathField" placeholder="/absolute/path/to/ride.mov">
+          </div>
+          <div>
+            <label for="gpxPathField">GPX path</label>
+            <input type="text" id="gpxPathField" placeholder="/absolute/path/to/ride.gpx">
+          </div>
+        </div>
+        <p class="path-note">For privacy, browsers only provide the filename. Paste an absolute path above if the input file is not beside <code class="inline">ride_overlay.py</code>.</p>
+        <div class="row">
+          <div>
+            <label for="outPathField">Output path</label>
+            <input type="text" id="outPathField" placeholder="data/ride_overlay.mp4">
+          </div>
+          <div>
+            <label for="resolvedStart">Resolved sync <span>(--gpx-start)</span></label>
+            <input type="text" id="resolvedStart" readonly>
+          </div>
+        </div>
+        <button id="copyCmdBtn">Copy CLI command</button>
+        <textarea id="cmdOut" rows="3" readonly aria-label="Generated CLI command"></textarea>
+      </fieldset>
+    </div>
+
+    <footer>
+      <span class="brand"><span class="brand-mark" aria-hidden="true"></span> GPX Video Overlay</span>
+      <span>Built to work with <code class="inline">ride_overlay.py</code></span>
+    </footer>
+  </section>
+</main>
+
+<div class="toast" id="copyToast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 "use strict";
@@ -259,6 +303,47 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const statusEl = document.getElementById("status");
+const videoWrap = video.closest(".video-wrap");
+const copyToast = document.getElementById("copyToast");
+let copyToastTimer;
+
+function showCopyToast() {
+  clearTimeout(copyToastTimer);
+  copyToast.textContent = "CLI command copied to clipboard.";
+  copyToast.classList.add("is-visible");
+  copyToastTimer = setTimeout(() => {
+    copyToast.classList.remove("is-visible");
+  }, 2400);
+}
+
+function alignOverlayCanvas() {
+  if (!video.videoWidth || !video.videoHeight) return;
+  const box = videoWrap.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+
+  const videoAspect = video.videoWidth / video.videoHeight;
+  const boxAspect = box.width / box.height;
+  let width, height, left, top;
+
+  if (boxAspect > videoAspect) {
+    height = box.height;
+    width = height * videoAspect;
+    left = (box.width - width) / 2;
+    top = 0;
+  } else {
+    width = box.width;
+    height = width / videoAspect;
+    left = 0;
+    top = (box.height - height) / 2;
+  }
+
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.style.left = `${left}px`;
+  canvas.style.top = `${top}px`;
+}
+
+new ResizeObserver(alignOverlayCanvas).observe(videoWrap);
 
 function log(msg) {
   statusEl.textContent = msg;
@@ -391,35 +476,6 @@ function sampleAt(samples, videoT) {
   return samples[lo];
 }
 
-function calibrateOffset(points, baseStartMs, durationSec, smoothWindow, gradientWindow, targets, searchWindow) {
-  let best = null;
-  for (let shift = -searchWindow; shift <= searchWindow; shift++) {
-    const candidateStart = baseStartMs + shift * 1000;
-    const samples = buildSamples(points, candidateStart, durationSec, smoothWindow, gradientWindow);
-    if (!samples.length) continue;
-    const errs = [];
-    for (const [vt, watts] of targets) {
-      const s = sampleAt(samples, vt);
-      if (s && s.power_smoothed != null) errs.push(Math.abs(s.power_smoothed - watts));
-    }
-    if (errs.length !== targets.length) continue;
-    const avg = errs.reduce((a, b) => a + b, 0) / errs.length;
-    if (!best || avg < best.avg) best = { shift, avg, start: candidateStart };
-  }
-  return best;
-}
-
-// ------------------------------------------------------------------ time --
-
-function parseTimecode(s) {
-  s = s.trim();
-  if (!s.includes(":")) return parseFloat(s);
-  const parts = s.split(":").map(Number);
-  let secs = 0;
-  for (const p of parts) secs = secs * 60 + p;
-  return secs;
-}
-
 // --------------------------------------------------------------- drawing --
 
 function drawHeart(c, x0, y0, x1, y1) {
@@ -492,7 +548,8 @@ function roundRectPath(c, x, y, w, h, r) {
 
 // -------------------------------------------------------------------- map --
 
-const ACCENT = "#4da6ff";
+const MAP_ROUTE_COLOR = "#f04444";
+const POWER_COLOR = "#8f67ff";
 
 function initMap() {
   if (state.map) { state.map.remove(); state.map = null; state.mapMarker = null; }
@@ -510,10 +567,11 @@ function initMap() {
   }).addTo(state.map);
 
   const latlngs = validPts.map(p => [p.lat, p.lon]);
-  const line = L.polyline(latlngs, { color: ACCENT, weight: 3 }).addTo(state.map);
+  L.polyline(latlngs, { color: "#ffffff", weight: 7, opacity: 0.9 }).addTo(state.map);
+  const line = L.polyline(latlngs, { color: MAP_ROUTE_COLOR, weight: 4, opacity: 1 }).addTo(state.map);
   state.map.fitBounds(line.getBounds(), { padding: [16, 16] });
   state.mapMarker = L.circleMarker(latlngs[0], {
-    radius: 7, color: "#fff", weight: 2, fillColor: ACCENT, fillOpacity: 1,
+    radius: 7, color: "#fff", weight: 3, fillColor: MAP_ROUTE_COLOR, fillOpacity: 1,
   }).addTo(state.map);
 
   state.map.on("click", e => {
@@ -571,7 +629,7 @@ function drawPowerChartBackground() {
     if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
   });
   cctx.lineTo(W, H); cctx.lineTo(0, H); cctx.closePath();
-  cctx.fillStyle = "rgba(77,166,255,0.22)";
+  cctx.fillStyle = "rgba(143,103,255,0.24)";
   cctx.fill();
 
   cctx.beginPath();
@@ -579,8 +637,8 @@ function drawPowerChartBackground() {
     const x = xOf(s.t), y = yOf(s.power_smoothed || 0);
     if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
   });
-  cctx.strokeStyle = ACCENT;
-  cctx.lineWidth = 2;
+  cctx.strokeStyle = POWER_COLOR;
+  cctx.lineWidth = 2.5;
   cctx.lineJoin = "round";
   cctx.stroke();
 
@@ -847,13 +905,18 @@ document.getElementById("videoFile").addEventListener("change", e => {
   document.getElementById("videoPathField").value = file.name;
   const outField = document.getElementById("outPathField");
   if (!outField.value) {
-    outField.value = file.name.replace(/\.[^.]+$/, "") + "_overlay.mp4";
+    outField.value = `data/${file.name.replace(/\.[^.]+$/, "")}_overlay.mp4`;
   }
   video.addEventListener("loadedmetadata", function onMeta() {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    alignOverlayCanvas();
     log(`Video loaded: ${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(1)}s`);
-    rebuildAndDraw();
+    if (state.points.length) {
+      onGpxSliderInput(parseFloat(document.getElementById("gpxSlider").value) || 0);
+    } else {
+      rebuildAndDraw();
+    }
     video.removeEventListener("loadedmetadata", onMeta);
   });
 });
@@ -880,14 +943,13 @@ document.getElementById("gpxFile").addEventListener("change", e => {
       slider.max = sliderSec.max = totalSec;
       slider.value = sliderSec.value = 0;
       slider.disabled = sliderSec.disabled = totalSec <= 0;
-      document.getElementById("setAnchorBtn").disabled = totalSec <= 0;
 
       state.baseStartMs = null; // a new GPX file invalidates any previous anchor
       state.chartView = { start: 0, end: 0 }; // a new GPX file resets any chart zoom
       initMap();
       drawPowerChartBackground();
       rebuildAndDraw();
-      showGpxPreview(0);
+      onGpxSliderInput(0);
     } catch (err) {
       log("Error parsing GPX: " + err.message);
     }
@@ -895,10 +957,33 @@ document.getElementById("gpxFile").addEventListener("change", e => {
   reader.readAsText(file);
 });
 
+let anchorRebuildTimer = null;
+
 function onGpxSliderInput(sec) {
   document.getElementById("gpxSlider").value = sec;
   document.getElementById("gpxSliderSec").value = sec;
   showGpxPreview(sec);
+
+  if (!state.points.length) return;
+  if (!video.duration || Number.isNaN(video.duration)) {
+    log("GPX loaded. Add a video and the sync will update automatically.");
+    return;
+  }
+
+  const videoSec = video.currentTime;
+  const gpxMs = state.points[0].t + sec * 1000;
+  state.baseStartMs = gpxMs - videoSec * 1000;
+  state.nudgeSec = 0;
+  document.getElementById("nudge").value = 0;
+  document.getElementById("nudgeVal").textContent = "0.0s";
+  document.getElementById("resolvedStart").value = new Date(state.baseStartMs).toISOString();
+
+  clearTimeout(anchorRebuildTimer);
+  anchorRebuildTimer = setTimeout(() => {
+    anchorRebuildTimer = null;
+    rebuildAndDraw();
+    log(`Synced automatically: video ${videoSec.toFixed(1)}s ↔ GPX ${formatGpxTime(sec)}`);
+  }, 90);
 }
 
 document.getElementById("gpxSlider").addEventListener("input", e => onGpxSliderInput(parseFloat(e.target.value)));
@@ -908,19 +993,6 @@ document.getElementById("gpxSliderSec").addEventListener("input", e => {
   if (Number.isNaN(sec)) return;
   sec = Math.max(0, Math.min(max, sec));
   onGpxSliderInput(sec);
-});
-
-document.getElementById("setAnchorBtn").addEventListener("click", () => {
-  if (!state.points.length) { log("Load a GPX file first."); return; }
-  if (!video.duration || Number.isNaN(video.duration)) { log("Load a video first."); return; }
-  const gpxSec = parseFloat(document.getElementById("gpxSlider").value);
-  const gpxMs = state.points[0].t + gpxSec * 1000;
-  state.baseStartMs = gpxMs - video.currentTime * 1000;
-  state.nudgeSec = 0;
-  document.getElementById("nudge").value = 0;
-  document.getElementById("nudgeVal").textContent = "0.0s";
-  rebuildAndDraw();
-  log(`Anchor set: video ${video.currentTime.toFixed(1)}s ↔ GPX ${formatGpxTime(gpxSec)}`);
 });
 
 document.getElementById("nudge").addEventListener("input", e => {
@@ -941,54 +1013,12 @@ document.getElementById("weightKg").addEventListener("input", () => {
   else draw();
 });
 
-function addCalibRow(vt = "", watts = "") {
-  const row = document.createElement("div");
-  row.className = "calib-row";
-  row.innerHTML = `
-    <input type="text" placeholder="video time e.g. 0:50" class="calib-vt" value="${vt}">
-    <input type="number" placeholder="watts e.g. 369" class="calib-w" value="${watts}">
-    <button type="button" class="secondary remove-row">&times;</button>
-  `;
-  row.querySelector(".remove-row").addEventListener("click", () => row.remove());
-  document.getElementById("calibRows").appendChild(row);
-}
-addCalibRow("0:50", "369");
-addCalibRow("2:58", "384");
-addCalibRow("3:16", "414");
-document.getElementById("addCalibRowBtn").addEventListener("click", () => addCalibRow());
-
-document.getElementById("calibrateBtn").addEventListener("click", () => {
-  const calibStatus = document.getElementById("calibStatus");
-  if (state.baseStartMs == null) { calibStatus.textContent = "Set an anchor first."; return; }
-  if (!state.points.length || !video.duration) { calibStatus.textContent = "Load a video and GPX first."; return; }
-
-  const targets = [];
-  for (const row of document.querySelectorAll(".calib-row")) {
-    const vtStr = row.querySelector(".calib-vt").value;
-    const wStr = row.querySelector(".calib-w").value;
-    if (!vtStr || !wStr) continue;
-    const vt = parseTimecode(vtStr), w = parseFloat(wStr);
-    if (!Number.isNaN(vt) && !Number.isNaN(w)) targets.push([vt, w]);
-  }
-  if (!targets.length) { calibStatus.textContent = "Add at least one (video time, watts) reading."; return; }
-
-  const best = calibrateOffset(state.points, state.baseStartMs, video.duration, SMOOTH_WINDOW, GRADIENT_WINDOW, targets, 30);
-  if (!best) { calibStatus.textContent = "Could not calibrate - no GPX data found near the anchor."; return; }
-
-  state.baseStartMs = best.start;
-  state.nudgeSec = 0;
-  document.getElementById("nudge").value = 0;
-  document.getElementById("nudgeVal").textContent = "0.0s";
-  calibStatus.textContent = `Shifted sync by ${best.shift >= 0 ? "+" : ""}${best.shift}s (avg error ${best.avg.toFixed(1)}W)`;
-  rebuildAndDraw();
-});
-
 document.getElementById("copyCmdBtn").addEventListener("click", () => {
   const resolved = document.getElementById("resolvedStart").value;
   if (!resolved) { log("No resolved sync yet - set an anchor first."); return; }
   const videoPath = document.getElementById("videoPathField").value || "ride.mov";
   const gpxPath = document.getElementById("gpxPathField").value || "ride.gpx";
-  const outPath = document.getElementById("outPathField").value || "ride_overlay.mp4";
+  const outPath = document.getElementById("outPathField").value || "data/ride_overlay.mp4";
   const metricsArr = currentMetrics();
   const metrics = metricsArr.join(",");
   const position = currentPosition();
@@ -1003,7 +1033,10 @@ document.getElementById("copyCmdBtn").addEventListener("click", () => {
   const cmdOut = document.getElementById("cmdOut");
   cmdOut.value = cmd;
   navigator.clipboard.writeText(cmd).then(
-    () => log("Command copied to clipboard."),
+    () => {
+      log("Command copied to clipboard.");
+      showCopyToast();
+    },
     () => { cmdOut.select(); log("Clipboard access blocked - command selected, copy manually (Cmd/Ctrl+C)."); }
   );
 });

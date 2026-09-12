@@ -193,13 +193,27 @@ def parse_timecode(s):
     return secs
 
 
+def parse_iso_datetime(value, option_name):
+    """Parse ISO-8601 timestamps, including a trailing Z on older Python versions."""
+    value = value.strip()
+    if value.endswith(("Z", "z")):
+        value = value[:-1] + "+00:00"
+    try:
+        return datetime.datetime.fromisoformat(value)
+    except ValueError:
+        sys.exit(
+            f"{option_name} must be a valid ISO-8601 timestamp, "
+            f"for example 2025-12-17T13:33:05.179Z"
+        )
+
+
 def parse_sync_arg(s):
     """'0:36=2026-08-22T13:56:20+02:00' -> (video_seconds, real_time_utc)"""
     if "=" not in s:
         sys.exit(f"--sync must look like VIDEO_TIME=ISO_TIMESTAMP, got: {s}")
     vt_str, real_str = s.split("=", 1)
     video_t = parse_timecode(vt_str)
-    real_time = datetime.datetime.fromisoformat(real_str.strip())
+    real_time = parse_iso_datetime(real_str, "--sync real-world time")
     if real_time.tzinfo is None:
         print("warning: --sync real-world time has no timezone offset, assuming UTC", file=sys.stderr)
         real_time = real_time.replace(tzinfo=datetime.timezone.utc)
@@ -458,7 +472,7 @@ def main():
     # and --probe use video-time relative to that original timeline, independent
     # of any --start/--end trim, so calibrating/probing still works on a clip.
     if args.gpx_start:
-        base_start = datetime.datetime.fromisoformat(args.gpx_start)
+        base_start = parse_iso_datetime(args.gpx_start, "--gpx-start")
         if base_start.tzinfo is None:
             base_start = base_start.replace(tzinfo=datetime.timezone.utc)
         base_start = base_start.astimezone(datetime.timezone.utc)
@@ -468,7 +482,7 @@ def main():
     else:
         if not video_info["creation_time"]:
             sys.exit("No --sync or --gpx-start given, and the video has no creation_time metadata to guess from.")
-        base_start = datetime.datetime.fromisoformat(video_info["creation_time"].replace("Z", "+00:00"))
+        base_start = parse_iso_datetime(video_info["creation_time"], "video creation_time")
         print(f"warning: no --sync/--gpx-start given, guessing from video metadata: {base_start.isoformat()}\n"
               f"         verify with --probe and/or --calibrate-power before trusting this.", file=sys.stderr)
 
