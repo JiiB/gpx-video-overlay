@@ -8,7 +8,7 @@
   --border-strong: rgba(228, 220, 255, 0.19);
   --text: #f5f1ff;
   --muted: #aaa2ba;
-  --faint: #746b86;
+  --faint: #948ca5;
   --accent: #8f67ff;
   --accent-strong: #a78bfa;
   --accent-ink: #100724;
@@ -1011,7 +1011,7 @@ button.secondary {
 .metrics-list input:checked + span {
   border-color: rgba(var(--accent-rgb), .5);
   background: rgba(var(--accent-rgb), .12);
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .metrics-list input:focus-visible + span {
