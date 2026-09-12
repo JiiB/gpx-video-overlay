@@ -138,6 +138,7 @@
         <div class="readout" aria-label="Current telemetry values">
           <div><div class="val" id="rHr">--</div><div class="lbl">Heart rate <span>bpm</span></div></div>
           <div><div class="val" id="rPower">--</div><div class="lbl">Power <span>3s avg</span></div></div>
+          <div><div class="val" id="rSpeed">--</div><div class="lbl">Speed <span>km/h</span></div></div>
           <div><div class="val" id="rEle">--</div><div class="lbl">Elevation <span>m</span></div></div>
           <div><div class="val" id="rGrad">--</div><div class="lbl">Gradient <span>%</span></div></div>
         </div>
@@ -223,6 +224,7 @@
           <label><input type="checkbox" value="hr" checked><span>Heart rate</span></label>
           <label><input type="checkbox" value="power" checked><span>Power</span></label>
           <label><input type="checkbox" value="wkg"><span>W/kg</span></label>
+          <label><input type="checkbox" value="speed" checked><span>Speed</span></label>
           <label><input type="checkbox" value="elevation" checked><span>Elevation</span></label>
           <label><input type="checkbox" value="gradient" checked><span>Gradient</span></label>
         </div>
@@ -429,12 +431,17 @@ function buildSamples(points, gpxStartMs, durationSec, smoothWindow, gradientWin
   }
 
   const grad = new Array(padded.length).fill(null);
+  const speed = new Array(padded.length).fill(null);
   for (let i = 0; i < padded.length; i++) {
     const lo = Math.max(0, i - gradientWindow), hi = Math.min(padded.length - 1, i + gradientWindow);
     const dDist = cumdist[hi] - cumdist[lo];
     const eleHi = padded[hi].ele, eleLo = padded[lo].ele;
     if (dDist > 3 && eleHi != null && eleLo != null) {
       grad[i] = Math.round((eleHi - eleLo) / dDist * 1000) / 10;
+    }
+    const dTime = (padded[hi].t - padded[lo].t) / 1000;
+    if (dTime > 0) {
+      speed[i] = Math.round(dDist / dTime * 3.6 * 10) / 10;
     }
   }
 
@@ -459,6 +466,7 @@ function buildSamples(points, gpxStartMs, durationSec, smoothWindow, gradientWin
       hr: p.hr,
       elevation: p.ele,
       gradient: lastGrad,
+      speed: speed[i],
       lat: p.lat,
       lon: p.lon,
     });
@@ -517,6 +525,18 @@ function drawIncline(c, x0, y0, x1, y1) {
   c.beginPath(); c.moveTo(x1, y0); c.lineTo(x1 - aw, y0 + ah * 0.5); c.lineTo(x1 - aw * 0.15, y0 + ah); c.closePath(); c.fill();
 }
 
+function drawSpeed(c, x0, y0, x1, y1) {
+  const w = x1 - x0, h = y1 - y0;
+  const cx = x0 + w / 2, cy = y0 + h * 0.62, r = Math.min(w, h) * 0.5;
+  c.lineWidth = Math.max(2, h * 0.09);
+  c.strokeStyle = c.fillStyle;
+  c.beginPath(); c.arc(cx, cy, r, Math.PI, Math.PI * 2); c.stroke();
+  c.beginPath();
+  c.moveTo(cx, cy); c.lineTo(cx + r * 0.75, cy - r * 0.62); c.lineTo(cx + r * 0.35, cy - r * 0.05);
+  c.closePath(); c.fill();
+  c.beginPath(); c.arc(cx, cy, r * 0.12, 0, Math.PI * 2); c.fill();
+}
+
 function currentWeightKg() {
   const w = parseFloat(document.getElementById("weightKg").value);
   return Number.isFinite(w) && w > 0 ? w : null;
@@ -525,6 +545,7 @@ function currentWeightKg() {
 const METRICS = {
   hr: { icon: drawHeart, unit: "bpm", fmt: s => s.hr != null ? String(Math.round(s.hr)) : null },
   power: { icon: drawBolt, unit: "W", fmt: s => s.power_smoothed != null ? String(s.power_smoothed) : null },
+  speed: { icon: drawSpeed, unit: "km/h", fmt: s => s.speed != null ? String(Math.round(s.speed)) : null },
   elevation: { icon: drawMountain, unit: "m", fmt: s => s.elevation != null ? String(Math.round(s.elevation)) : null },
   gradient: {
     icon: drawIncline, unit: "grade",
@@ -836,6 +857,7 @@ function drawBadge(sample) {
 function updateReadout(sample) {
   document.getElementById("rHr").textContent = sample && sample.hr != null ? Math.round(sample.hr) : "--";
   document.getElementById("rPower").textContent = sample && sample.power_smoothed != null ? sample.power_smoothed : "--";
+  document.getElementById("rSpeed").textContent = sample && sample.speed != null ? Math.round(sample.speed) : "--";
   document.getElementById("rEle").textContent = sample && sample.elevation != null ? Math.round(sample.elevation) : "--";
   document.getElementById("rGrad").textContent = sample && sample.gradient != null
     ? (sample.gradient >= 0 ? "+" : "") + sample.gradient.toFixed(1) + "%" : "--";

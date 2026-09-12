@@ -160,7 +160,7 @@ Run `python3 ride_overlay.py --help` for the full, current list. Summary:
 | `--calibrate-window N` | search radius in seconds for `--calibrate-power` (default 30) |
 | `--nudge SECONDS` | manual final adjustment |
 | `--probe VIDEO_TIME[,...]` | print telemetry at given times, no render |
-| `--metrics hr,power,wkg,elevation,gradient` | which badge items to show, and in what order (default: `hr,power,elevation,gradient`) |
+| `--metrics hr,power,speed,wkg,elevation,gradient` | which badge items to show, and in what order (default: `hr,power,speed,elevation,gradient`) |
 | `--weight-kg N` | rider weight in kg, required if `wkg` (watts/kg) is in `--metrics` |
 | `--position bottom-left\|bottom-right\|top-left\|top-right` | badge corner |
 | `--smooth-window N` | power trailing-average window, seconds (default 3) |

@@ -131,12 +131,16 @@ def build_samples(points, gpx_start, duration, smooth_window, gradient_window, w
 
     gw = gradient_window
     grad = [None] * len(padded)
+    speed = [None] * len(padded)
     for i in range(len(padded)):
         lo, hi = max(0, i - gw), min(len(padded) - 1, i + gw)
         d_dist = cumdist[hi] - cumdist[lo]
         ele_hi, ele_lo = padded[hi]["ele"], padded[lo]["ele"]
         if d_dist > 3 and ele_hi is not None and ele_lo is not None:
             grad[i] = round((ele_hi - ele_lo) / d_dist * 100, 1)
+        d_time = (padded[hi]["time"] - padded[lo]["time"]).total_seconds()
+        if d_time > 0:
+            speed[i] = round(d_dist / d_time * 3.6, 1)
 
     sw = smooth_window
     power_raw = [p["power"] for p in padded]
@@ -160,6 +164,7 @@ def build_samples(points, gpx_start, duration, smooth_window, gradient_window, w
             "hr": p["hr"],
             "elevation": p["ele"],
             "gradient": last_grad,
+            "speed": speed[i],
             "wkg": power_smoothed[i] / weight_kg if power_smoothed[i] is not None and weight_kg else None,
         })
     return samples
@@ -305,10 +310,24 @@ def draw_incline(draw, box, color):
     draw.polygon([(x1, y0), (x1 - aw, y0 + ah * 0.5), (x1 - aw * 0.15, y0 + ah)], fill=color)
 
 
+def draw_speed(draw, box, color):
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    cx, cy, r = x0 + w / 2, y0 + h * 0.62, min(w, h) * 0.5
+    draw.arc([cx - r, cy - r, cx + r, cy + r], 180, 360, fill=color, width=max(2, round(h * 0.09)))
+    draw.polygon(
+        [(cx, cy), (cx + r * 0.75, cy - r * 0.62), (cx + r * 0.35, cy - r * 0.05)],
+        fill=color,
+    )
+    draw.ellipse([cx - r * 0.12, cy - r * 0.12, cx + r * 0.12, cy + r * 0.12], fill=color)
+
+
 METRICS = {
     "hr": {"icon": draw_heart, "unit": "bpm", "fmt": lambda s: str(s["hr"]) if s["hr"] is not None else None},
     "power": {"icon": draw_bolt, "unit": "W",
               "fmt": lambda s: str(s["power_smoothed"]) if s["power_smoothed"] is not None else None},
+    "speed": {"icon": draw_speed, "unit": "km/h",
+              "fmt": lambda s: str(round(s["speed"])) if s.get("speed") is not None else None},
     "elevation": {"icon": draw_mountain, "unit": "m",
                   "fmt": lambda s: str(round(s["elevation"])) if s["elevation"] is not None else None},
     "gradient": {"icon": draw_incline, "unit": "grade",
@@ -436,9 +455,9 @@ def main():
                          help="print telemetry at these video timestamps and exit, no rendering "
                               "(e.g. '0:50,2:58,3:16')")
 
-    parser.add_argument("--metrics", default="hr,power,elevation,gradient",
-                         help="comma-separated subset/order of: hr,power,wkg,elevation,gradient "
-                              "(default: hr,power,elevation,gradient)")
+    parser.add_argument("--metrics", default="hr,power,speed,elevation,gradient",
+                         help="comma-separated subset/order of: hr,power,speed,wkg,elevation,gradient "
+                              "(default: hr,power,speed,elevation,gradient)")
     parser.add_argument("--weight-kg", type=float, default=None,
                          help="rider weight in kg, required if 'wkg' (watts/kg) is included in --metrics")
     parser.add_argument("--position", default="bottom-left",
